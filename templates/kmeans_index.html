@@ -1,0 +1,257 @@
+{% extends "kmeans_base.html" %}
+
+{% block title %}K-Means Clustering Visualizer{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Left Panel - Controls -->
+    <div class="lg:col-span-1">
+        <div class="border border-black p-6 sticky top-4">
+            <h2 class="text-2xl font-semibold mb-6 mono">configure_parameters()</h2>
+
+            <form id="generateForm" class="space-y-6">
+                <div>
+                    <label class="block mb-2 font-medium mono">
+                        n <span class="text-gray-700 font-normal">(number of points)</span>
+                    </label>
+                    <input type="number" name="n" id="nInput" value="50" min="10" max="100" class="input-field" required>
+                    <p class="text-xs text-gray-700 mt-1 mono">range: 10-100 points</p>
+                </div>
+
+                <div>
+                    <label class="block mb-2 font-medium mono">
+                        k <span class="text-gray-700 font-normal">(number of clusters)</span>
+                    </label>
+                    <input type="number" name="k" id="kInput" value="3" min="2" max="10" class="input-field" required>
+                    <p class="text-xs text-gray-700 mt-1 mono">range: 2-10 clusters</p>
+                </div>
+
+                <div>
+                    <label class="block mb-2 font-medium mono">
+                        rounds <span class="text-gray-700 font-normal">(iterations)</span>
+                    </label>
+                    <input type="number" name="rounds" id="roundsInput" value="10" min="1" max="50" class="input-field" required>
+                    <p class="text-xs text-gray-700 mt-1 mono">range: 1-50 rounds</p>
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" class="btn w-full mono">
+                        generate_clusters()
+                    </button>
+                </div>
+            </form>
+
+            <div id="loading" class="hidden mt-6 text-center mono text-sm">
+                <div class="spinner mx-auto mb-3"></div>
+                <div class="pulse">running k-means algorithm...</div>
+            </div>
+
+            <div id="success" class="hidden mt-6 p-4 border border-black">
+                <p class="mono text-sm mb-2">✓ clustering complete</p>
+                <p class="mono text-xs text-gray-700 mb-4">
+                    <span id="pointCount"></span> points grouped into <span id="clusterCount"></span> clusters
+                </p>
+            </div>
+
+            <div class="mt-6 p-4 bg-white border border-black">
+                <h3 class="font-semibold mono text-sm mb-2">how it works:</h3>
+                <div class="space-y-2 text-xs mono text-gray-800">
+                    <p>→ <span class="font-semibold">Step 1:</span> Random centroids are initialized</p>
+                    <p>→ <span class="font-semibold">Step 2:</span> Points assigned to nearest centroid</p>
+                    <p>→ <span class="font-semibold">Step 3:</span> Centroids move to cluster centers</p>
+                    <p>→ <span class="font-semibold">Repeat:</span> Until convergence or max rounds</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Visualization -->
+    <div class="lg:col-span-2">
+        <div class="border border-black p-6">
+            <div id="visualizationSection" class="hidden">
+                <h2 class="text-xl font-semibold mb-4 mono">visualization</h2>
+
+                <!-- Round Slider -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-medium mono">round</label>
+                        <span id="roundValue" class="mono text-sm bg-white px-3 py-1 border border-black">0</span>
+                    </div>
+                    <input type="range" id="roundSlider" min="0" max="10" step="1" value="0" class="w-full">
+                    <div class="flex justify-between text-xs mono text-gray-700 mt-1">
+                        <span>initial</span>
+                        <span id="maxRoundLabel">round 10</span>
+                    </div>
+                </div>
+
+                <!-- Plot Container -->
+                <div id="plotContainer" class="relative border border-black">
+                    <div id="plotLoading" class="text-center py-16 mono text-sm">
+                        <div class="spinner mx-auto mb-3"></div>
+                        <div class="pulse">loading visualization...</div>
+                    </div>
+                    <img id="plotImage" src="" alt="K-Means Clustering" class="w-full hidden">
+                </div>
+
+                <!-- Controls -->
+                <div class="mt-4 flex gap-4">
+                    <button id="playBtn" class="btn flex-1 mono">
+                        ▶ play animation
+                    </button>
+                    <button id="resetBtn" class="btn-outline flex-1 mono">
+                        reset to round 0
+                    </button>
+                </div>
+            </div>
+
+            <!-- Initial State -->
+            <div id="initialState" class="text-center py-16 mono">
+                <p class="text-gray-500 mb-4">← configure parameters and generate clusters</p>
+                <p class="text-xs text-gray-500">visualization will appear here</p>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="mt-4 p-4 bg-white border border-black">
+            <h3 class="font-semibold mono text-sm mb-2">legend:</h3>
+            <div class="space-y-1 text-xs mono text-gray-800">
+                <p>● <span class="text-gray-700">colored circles:</span> data points in each cluster</p>
+                <p>✕ <span class="text-gray-700">large crosses:</span> current centroid positions</p>
+                <p>⋯ <span class="text-gray-700">dashed lines:</span> centroid movement trail</p>
+                <p>→ <span class="text-gray-700">arrows:</span> direction of centroid movement</p>
+            </div>
+        </div>
+
+        <!-- Educational Info -->
+        <div class="mt-4 p-4 bg-white border border-black">
+            <h3 class="font-semibold mono text-sm mb-2">understanding k-means:</h3>
+            <p class="text-xs mono text-gray-800 leading-relaxed">
+                K-Means is an <span class="font-semibold">unsupervised learning</span> algorithm that groups 
+                similar data points together. It works by iteratively updating cluster centers (centroids) 
+                until they stabilize. The algorithm minimizes the <span class="font-semibold">within-cluster 
+                sum of squares</span>, making points within each cluster as similar as possible. Use the 
+                slider to see how centroids move and clusters form over iterations!
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const generateForm = document.getElementById('generateForm');
+    const loading = document.getElementById('loading');
+    const success = document.getElementById('success');
+    const visualizationSection = document.getElementById('visualizationSection');
+    const initialState = document.getElementById('initialState');
+    const plotLoading = document.getElementById('plotLoading');
+    const plotImage = document.getElementById('plotImage');
+    const roundSlider = document.getElementById('roundSlider');
+    const roundValue = document.getElementById('roundValue');
+    const maxRoundLabel = document.getElementById('maxRoundLabel');
+    const playBtn = document.getElementById('playBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let maxRounds = 10;
+    let isPlaying = false;
+    let playInterval = null;
+
+    generateForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        loading.classList.remove('hidden');
+        success.classList.add('hidden');
+        visualizationSection.classList.add('hidden');
+
+        const formData = new FormData(generateForm);
+
+        try {
+            const response = await fetch('/generate', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('pointCount').textContent = data.n;
+                document.getElementById('clusterCount').textContent = data.k;
+                maxRounds = data.rounds;
+                
+                roundSlider.max = maxRounds;
+                roundSlider.value = 0;
+                maxRoundLabel.textContent = `round ${maxRounds}`;
+                
+                success.classList.remove('hidden');
+                visualizationSection.classList.remove('hidden');
+                initialState.classList.add('hidden');
+                
+                // Load initial plot
+                await loadPlot(0);
+            }
+        } catch (error) {
+            alert('Error generating clusters: ' + error.message);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    });
+
+    async function loadPlot(round) {
+        plotLoading.classList.remove('hidden');
+        plotImage.classList.add('hidden');
+        roundValue.textContent = round;
+
+        try {
+            const response = await fetch(`/get_plot/${round}`);
+            const data = await response.json();
+
+            if (data.image) {
+                plotImage.src = 'data:image/png;base64,' + data.image;
+                plotImage.classList.remove('hidden');
+                plotLoading.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Error loading plot:', error);
+        }
+    }
+
+    roundSlider.addEventListener('input', (e) => {
+        const round = parseInt(e.target.value);
+        loadPlot(round);
+    });
+
+    playBtn.addEventListener('click', () => {
+        if (isPlaying) {
+            // Stop animation
+            isPlaying = false;
+            playBtn.textContent = '▶ play animation';
+            clearInterval(playInterval);
+        } else {
+            // Start animation
+            isPlaying = true;
+            playBtn.textContent = '⏸ pause animation';
+            
+            playInterval = setInterval(() => {
+                let currentRound = parseInt(roundSlider.value);
+                
+                if (currentRound >= maxRounds) {
+                    currentRound = 0;
+                } else {
+                    currentRound++;
+                }
+                
+                roundSlider.value = currentRound;
+                loadPlot(currentRound);
+            }, 1000);
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (isPlaying) {
+            playBtn.click(); // Stop animation
+        }
+        roundSlider.value = 0;
+        loadPlot(0);
+    });
+</script>
+{% endblock %}
