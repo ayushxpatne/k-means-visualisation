@@ -11,54 +11,34 @@ from matplotlib.patches import FancyArrowPatch, Ellipse
 app = Flask(__name__)
 app.secret_key = 'kmeans_secret_key_2024'
 
-def get_euclidean_distance(x1, x2, y1, y2):
-    return np.sqrt((x1-x2)**2 + (y1-y2)**2)
+# --- Vectorized Core Functions ---
 
-def generate_points(n, x_max=20, y_max=20):
-    """Generate random points"""
-    x_arr = [random.randint(0, x_max) for _ in range(n)]
-    y_arr = [random.randint(0, y_max) for _ in range(n)]
-    return x_arr, y_arr
-
-def initialize_centroids(k, x_max=20, y_max=20):
-    """Initialize random centroids"""
-    x_c = [random.uniform(0, x_max) for _ in range(k)]
-    y_c = [random.uniform(0, y_max) for _ in range(k)]
-    return x_c, y_c
-
-def assign_centroids(x_arr, y_arr, centroids_data, k):
-    """Assign points to nearest centroid"""
-    for j in range(k):
-        centroids_data[f"centroid_{j}_points"] = []
+def get_data_arrays(x_arr, y_arr, centroids_data, k):
+    """Converts Python lists/dicts to optimized NumPy arrays."""
+    # Points array (N, 2)
+    points = np.array(list(zip(x_arr, y_arr)), dtype=np.float64)
     
-    for i in range(len(x_arr)):
-        x1, y1 = x_arr[i], y_arr[i]
-        
-        min_dist = float('inf')
-        nearest_centroid = 0
-        
-        for j in range(k):
-            x2, y2 = centroids_data[f"centroid_{j}_xy"]
-            dist = get_euclidean_distance(x1, x2, y1, y2)
-            
-            if dist < min_dist:
-                min_dist = dist
-                nearest_centroid = j
-        
-        centroids_data[f"centroid_{nearest_centroid}_points"].append([x1, y1])
+    # Centroids array (K, 2)
+    centroids = np.array([centroids_data[f"centroid_{j}_xy"] for j in range(k)], dtype=np.float64)
+    
+    return points, centroids
 
-def recalculate_centroids(centroids_data, k):
-    """Recalculate centroid positions based on assigned points"""
-    for j in range(k):
-        points = centroids_data[f"centroid_{j}_points"]
-        if len(points) > 0:
-            sum_x = sum(p[0] for p in points)
-            sum_y = sum(p[1] for p in points)
-            
-            new_x = sum_x / len(points)
-            new_y = sum_y / len(points)
-            
-            centroids_data[f"centroid_{j}_xy"] = [new_x, new_y]
+def assign_centroids_vectorized(points, centroids, k):
+    """
+    Assigns points to the nearest centroid using NumPy broadcasting for speed.
+    Returns: assignment_indices (N,), distances (N, K)
+    """
+    # 1. Calculate the difference between every point and every centroid. (N, K, 2)
+    # The newaxis magic: (N, 1, 2) - (1, K, 2) -> (N, K, 2)
+    diff = points[:, np.newaxis, :] - centroids[np.newaxis, :, :]
+    
+    # 2. Square the differences and sum the dimensions (x^2 + y^2). (N, K)
+    sq_distances = np.sum(diff**2, axis=2)
+    
+    # 3. Find the index of the minimum distance for each point. (N,)
+    assignment_indices = np.argmin(sq_distances, axis=1)
+    
+    return assignment_indices
 
 def run_kmeans(x_arr, y_arr, k, rounds):
     """Run K-means algorithm and store history"""
@@ -70,43 +50,64 @@ def run_kmeans(x_arr, y_arr, k, rounds):
         centroids_data[f"centroid_{j}_xy"] = [x_c[j], y_c[j]]
         centroids_data[f"centroid_{j}_points"] = []
     
+    # Get initial NumPy data structure
+    points, current_centroids = get_data_arrays(x_arr, y_arr, centroids_data, k)
+    
     # Round -1: Initial State (Points and Centroids, NO assignment)
     history = [{
-        'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
-        'assignments': [[] for j in range(k)], # Empty assignment list
-        'all_points': list(zip(x_arr, y_arr)), # Full list of all points
-        'prev_centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
+        'centroids': [list(c) for c in current_centroids],
+        'assignments': [[] for j in range(k)], 
+        'all_points': list(zip(x_arr, y_arr)), 
+        'prev_centroids': [list(c) for c in current_centroids],
     }]
     
-    # Round 0: First Assignment Step (Points are now colored)
-    assign_centroids(x_arr, y_arr, centroids_data, k)
-    
-    history.append({
-        'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
-        'assignments': [[list(p) for p in centroids_data[f"centroid_{j}_points"]] for j in range(k)],
-        'all_points': [],
-        'prev_centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)], # Previous is the initial random position
-    })
-    
-    # Run K-means for Rounds 1 to 'rounds'
-    for round_num in range(rounds):
+    # K-Means Loop
+    for round_num in range(rounds + 1):
+        prev_centroids_state = [list(c) for c in current_centroids]
         
-        prev_centroids_state = [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)]
+        if round_num > 0:
+            # Step 1: Recalculate Centroid Positions (only from Round 1 onwards)
+            # Use the assignments from the previous step to find new means
+            new_centroids = np.copy(current_centroids)
+            for j in range(k):
+                # Select all points assigned to cluster j
+                cluster_points = points[assignment_indices == j]
+                if len(cluster_points) > 0:
+                    new_centroids[j] = np.mean(cluster_points, axis=0)
+            current_centroids = new_centroids
         
-        # K-Means Step 1: Recalculate Centroid Positions 
-        recalculate_centroids(centroids_data, k)
+        # Step 2: Assign Points (Run for Round 0 and all subsequent rounds)
+        assignment_indices = assign_centroids_vectorized(points, current_centroids, k)
         
-        # K-Means Step 2: Assign Points
-        assign_centroids(x_arr, y_arr, centroids_data, k)
+        # Organize assignments for history/plotting
+        assignments_list = []
+        for j in range(k):
+            cluster_points_list = points[assignment_indices == j].tolist()
+            assignments_list.append(cluster_points_list)
         
         history.append({
-            'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
-            'assignments': [[list(p) for p in centroids_data[f"centroid_{j}_points"]] for j in range(k)],
+            'centroids': [list(c) for c in current_centroids],
+            'assignments': assignments_list,
             'all_points': [],
             'prev_centroids': prev_centroids_state,
         })
-    
+        
+    # The history list is now [Round -1, Round 0, Round 1, ..., Round R]
     return history
+
+# --- Visualization Functions (Unchanged, but robust) ---
+
+def initialize_centroids(k, x_max=20, y_max=20):
+    """Initialize random centroids (unchanged)"""
+    x_c = [random.uniform(0, x_max) for _ in range(k)]
+    y_c = [random.uniform(0, y_max) for _ in range(k)]
+    return x_c, y_c
+
+def generate_points(n, x_max=20, y_max=20):
+    """Generate random points (unchanged)"""
+    x_arr = [random.randint(0, x_max) for _ in range(n)]
+    y_arr = [random.randint(0, y_max) for _ in range(n)]
+    return x_arr, y_arr
 
 def create_plot_base64(k, history_index, history):
     """Create visualization for a specific history index"""
@@ -147,32 +148,28 @@ def create_plot_base64(k, history_index, history):
                     ax.add_patch(arrow)
     
     
-    # ------------------------------------------------------------------
-    # *** NEW FEATURE: Cluster Glow (Ellipse) ***
-    # ------------------------------------------------------------------
+    # Cluster Glow (Ellipse)
     if round_num >= 0:
         for j in range(k):
             points = np.array(current_state['assignments'][j])
             
-            if len(points) >= 2: # Need at least 2 points to calculate variance
+            if len(points) >= 2: 
                 cx, cy = current_state['centroids'][j]
                 
-                # Calculate standard deviation for spread (or covariance for orientation)
-                std_x = np.std(points[:, 0]) * 1.5 # 1.5x scaling for visibility
+                # Calculate standard deviation for spread
+                std_x = np.std(points[:, 0]) * 1.5 
                 std_y = np.std(points[:, 1]) * 1.5 
                 
-                # Use a larger minimum size to ensure small clusters are visible
                 width = max(std_x * 2, 2.5) 
                 height = max(std_y * 2, 2.5)
                 
-                # Create and add the translucent ellipse
                 ellipse = Ellipse((cx, cy), width, height, 
-                                  angle=0, # Simplification: assume no rotation
-                                  alpha=0.15, # Faint glow
+                                  angle=0,
+                                  alpha=0.15,
                                   facecolor=colors[j],
                                   edgecolor=colors[j],
                                   linewidth=1,
-                                  zorder=0) # Place far back
+                                  zorder=0) 
                 ax.add_patch(ellipse)
 
     # Plot points
@@ -191,7 +188,7 @@ def create_plot_base64(k, history_index, history):
                 points_x = [p[0] for p in points]
                 points_y = [p[1] for p in points]
                 ax.scatter(points_x, points_y, c=colors[j], s=80, 
-                          alpha=0.6, edgecolors='black', linewidth=1, zorder=1) # Above the glow
+                          alpha=0.6, edgecolors='black', linewidth=1, zorder=1)
 
     # Plot ghost of previous centroid (Ghost only appears for Round 1 onwards)
     if round_num >= 1:
@@ -231,6 +228,8 @@ def create_plot_base64(k, history_index, history):
     
     return img_base64
 
+# --- Flask Routes ---
+
 @app.route('/')
 def index():
     return render_template('kmeans_index.html')
@@ -242,11 +241,13 @@ def generate():
     rounds = int(request.form.get('rounds', 10))
     
     x_arr, y_arr = generate_points(n)
+    # The run_kmeans function is now significantly faster due to vectorization
     history = run_kmeans(x_arr, y_arr, k, rounds)
     
     total_states = rounds + 2 
     all_plots_base64 = []
     
+    # This loop remains the bottleneck (Matplotlib rendering), but is unavoidable
     for r in range(total_states): 
         img_base64 = create_plot_base64(k, r, history)
         all_plots_base64.append(img_base64)
