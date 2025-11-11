@@ -32,14 +32,14 @@
                         <label class="font-medium mono">rounds <span class="text-gray-700 font-normal">(iterations)</span></label>
                         <span id="roundsValue" class="mono text-sm bg-white px-3 py-1 border border-black">10</span>
                     </div>
-                    <input type="range" name="rounds" id="roundsInput" min="1" max="50" step="1" value="10" class="w-full">
-                    <p class="text-xs text-gray-700 mt-1 mono">range: 1-50 rounds</p>
+                    <input type="range" name="rounds" id="roundsInput" min="1" max="20" step="1" value="10" class="w-full">
+                    <p class="text-xs text-gray-700 mt-1 mono">range: 1-20 rounds</p>
                 </div>
                 
-                <div class="mt-4 p-3 bg-gray-100 border border-black mono text-xs text-gray-800">
+                <!-- <div class="mt-4 p-3 bg-gray-100 border border-black mono text-xs text-gray-800">
                     <p class="font-semibold mb-1">Recommended for Website:</p>
                     <p>For best performance on the live website, use **50 points**, **3 clusters**, and **5 rounds**.</p>
-                </div>
+                </div> -->
 
                 <div class="pt-4">
                     <button type="submit" class="btn w-full mono">
@@ -50,7 +50,7 @@
 
             <div id="loading" class="hidden mt-6 text-center mono text-sm">
                 <div class="spinner mx-auto mb-3"></div>
-                <div class="pulse">running k-means algorithm & rendering plots...</div>
+                <div class="pulse">running k-means algorithm...</div>
             </div>
 
             <div id="success" class="hidden mt-6 p-4 border border-black">
@@ -89,11 +89,7 @@
                     </div>
                 </div>
 
-                <div id="plotContainer" class="relative border border-black">
-                    <div id="plotLoading" class="text-center py-16 mono text-sm hidden">
-                    </div>
-                    <img id="plotImage" src="" alt="K-Means Clustering" class="w-full hidden">
-                </div>
+                <div id="plotContainer" class="relative border border-black bg-white" style="width: 100%; height: 0; padding-bottom: 100%; overflow: hidden;"></div>
 
                 <div class="mt-4 flex gap-4">
                     <button id="playBtn" class="btn flex-1 mono">
@@ -116,7 +112,7 @@
             <div class="space-y-1 text-xs mono text-gray-800">
                 <p>● <span class="text-gray-700">colored circles:</span> data points in each cluster</p>
                 <p>● <span class="text-gray-500">grey circles:</span> unassigned points (Round -1)</p>
-                <p>⚪ <span class="text-gray-700">faint colored ellipse:</span> subtle **cluster glow** (based on point spread)</p>
+                <p>○ <span class="text-gray-700">faint colored ellipse:</span> subtle **cluster glow** (based on point spread)</p>
                 <p>✕ <span class="text-gray-700">large crosses:</span> current centroid positions</p>
                 <p><span class="text-gray-400">faint ✕:</span> previous centroid position (ghost)</p>
                 <p>⋯ <span class="text-gray-700">dashed lines:</span> centroid movement trail</p>
@@ -139,20 +135,20 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script>
     const generateForm = document.getElementById('generateForm');
     const loading = document.getElementById('loading');
     const success = document.getElementById('success');
     const visualizationSection = document.getElementById('visualizationSection');
     const initialState = document.getElementById('initialState');
-    const plotImage = document.getElementById('plotImage');
+    const plotContainer = document.getElementById('plotContainer');
     const roundSlider = document.getElementById('roundSlider');
     const roundValue = document.getElementById('roundValue');
     const maxRoundLabel = document.getElementById('maxRoundLabel');
     const playBtn = document.getElementById('playBtn');
     const resetBtn = document.getElementById('resetBtn');
 
-    // Element references for sliders
     const nInput = document.getElementById('nInput');
     const nValue = document.getElementById('nValue');
     const kInput = document.getElementById('kInput');
@@ -160,13 +156,14 @@
     const roundsInput = document.getElementById('roundsInput');
     const roundsValue = document.getElementById('roundsValue');
 
-
     let maxRounds = 10;
     let isPlaying = false;
     let playInterval = null;
-    let plotCache = []; 
+    let clusteringData = null;
+    
+    const colors = ['#ef4444', '#ec4899', '#22c55e', '#3b82f6', '#f97316', 
+                   '#a855f7', '#78716c', '#64748b', '#84cc16', '#06b6d4'];
 
-    // Update value displays for sliders
     nInput.addEventListener('input', () => nValue.textContent = nInput.value);
     kInput.addEventListener('input', () => kValue.textContent = kInput.value);
     roundsInput.addEventListener('input', () => roundsValue.textContent = roundsInput.value);
@@ -181,8 +178,6 @@
         loading.classList.remove('hidden');
         success.classList.add('hidden');
         visualizationSection.classList.add('hidden');
-        plotImage.classList.add('hidden');
-        plotCache = []; 
 
         const formData = new FormData(generateForm);
 
@@ -199,20 +194,17 @@
                 document.getElementById('clusterCount').textContent = data.k;
                 
                 maxRounds = data.rounds;
+                clusteringData = data;
                 
-                // Set slider range from -1 up to maxRounds
                 roundSlider.min = -1;
                 roundSlider.max = maxRounds;
-                roundSlider.value = -1; // Start at Round -1
+                roundSlider.value = -1;
                 maxRoundLabel.textContent = `round ${maxRounds}`;
-
-                plotCache = data.plots; 
                 
                 success.classList.remove('hidden');
                 visualizationSection.classList.remove('hidden');
                 initialState.classList.add('hidden');
                 
-                // Display initial plot (-1) from cache instantly
                 displayPlot(-1);
             }
         } catch (error) {
@@ -222,18 +214,226 @@
         }
     });
 
-    // Function to display plot from the local cache instantly
     function displayPlot(round) {
-        // Round -1 is at plotCache[0], Round 0 is at plotCache[1], etc.
-        const historyIndex = round + 1; 
-        if (plotCache[historyIndex]) {
-            plotImage.src = 'data:image/png;base64,' + plotCache[historyIndex];
-            plotImage.classList.remove('hidden');
-            roundValue.textContent = round;
+        if (!clusteringData) return;
+        
+        const historyIndex = round + 1;
+        const currentState = clusteringData.history[historyIndex];
+        const k = clusteringData.k;
+        
+        const traces = [];
+        
+        // Plot points
+        if (round === -1) {
+            // Unassigned points
+            const points = currentState.all_points;
+            const x = points.map(p => p[0]);
+            const y = points.map(p => p[1]);
+            
+            traces.push({
+                x: x,
+                y: y,
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Unassigned Points',
+                marker: {
+                    color: '#4b5563',
+                    size: 10,
+                    opacity: 0.6,
+                    line: { color: 'black', width: 1 }
+                }
+            });
         } else {
-            plotImage.classList.add('hidden');
-            roundValue.textContent = round;
+            // Assigned points
+            for (let j = 0; j < k; j++) {
+                const points = currentState.assignments[j];
+                if (points.length > 0) {
+                    const x = points.map(p => p[0]);
+                    const y = points.map(p => p[1]);
+                    
+                    traces.push({
+                        x: x,
+                        y: y,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: `Cluster ${j + 1}`,
+                        marker: {
+                            color: colors[j],
+                            size: 10,
+                            opacity: 0.6,
+                            line: { color: 'black', width: 1 }
+                        }
+                    });
+                }
+            }
         }
+        
+        // Plot centroid trails (Round 0 onwards)
+        if (round >= 0) {
+            for (let j = 0; j < k; j++) {
+                const trailX = [];
+                const trailY = [];
+                
+                for (let r = 1; r <= Math.min(historyIndex, clusteringData.history.length - 1); r++) {
+                    trailX.push(clusteringData.history[r].centroids[j][0]);
+                    trailY.push(clusteringData.history[r].centroids[j][1]);
+                }
+                
+                if (trailX.length > 1) {
+                    traces.push({
+                        x: trailX,
+                        y: trailY,
+                        mode: 'lines+markers',
+                        type: 'scatter',
+                        name: `Centroid ${j + 1} Trail`,
+                        showlegend: false,
+                        line: {
+                            color: colors[j],
+                            width: 2,
+                            dash: 'dash'
+                        },
+                        marker: {
+                            color: colors[j],
+                            size: 6,
+                            symbol: 'arrow',
+                            angleref: 'previous'
+                        },
+                        opacity: 0.5
+                    });
+                }
+            }
+        }
+        
+        // Plot ghost centroids (Round 1 onwards)
+        if (round >= 1) {
+            const prevCentroids = currentState.prev_centroids;
+            const ghostX = prevCentroids.map(c => c[0]);
+            const ghostY = prevCentroids.map(c => c[1]);
+            const ghostColors = Array(k).fill(0).map((_, j) => colors[j]);
+            
+            traces.push({
+                x: ghostX,
+                y: ghostY,
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Previous Centroids',
+                showlegend: false,
+                marker: {
+                    color: ghostColors,
+                    size: 20,
+                    symbol: 'x',
+                    opacity: 0.3,
+                    line: { color: 'black', width: 2 }
+                }
+            });
+        }
+        
+        // Plot current centroids
+        const centroidX = currentState.centroids.map(c => c[0]);
+        const centroidY = currentState.centroids.map(c => c[1]);
+        const centroidColors = Array(k).fill(0).map((_, j) => colors[j]);
+        
+        traces.push({
+            x: centroidX,
+            y: centroidY,
+            mode: 'markers',
+            type: 'scatter',
+            name: 'Current Centroids',
+            showlegend: false,
+            marker: {
+                color: centroidColors,
+                size: 20,
+                symbol: 'x',
+                line: { color: 'black', width: 2 }
+            }
+        });
+        
+        // Add cluster ellipses as shapes (Round 0 onwards)
+        const shapes = [];
+        if (round >= 0) {
+            for (let j = 0; j < k; j++) {
+                const points = currentState.assignments[j];
+                if (points.length >= 2) {
+                    const cx = currentState.centroids[j][0];
+                    const cy = currentState.centroids[j][1];
+                    
+                    const xs = points.map(p => p[0]);
+                    const ys = points.map(p => p[1]);
+                    
+                    const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+                    const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
+                    const stdX = Math.sqrt(xs.reduce((s, x) => s + (x - meanX) ** 2, 0) / xs.length) * 1.5;
+                    const stdY = Math.sqrt(ys.reduce((s, y) => s + (y - meanY) ** 2, 0) / ys.length) * 1.5;
+                    
+                    const width = Math.max(stdX * 2, 2.5);
+                    const height = Math.max(stdY * 2, 2.5);
+                    
+                    shapes.push({
+                        type: 'circle',
+                        xref: 'x',
+                        yref: 'y',
+                        x0: cx - width / 2,
+                        y0: cy - height / 2,
+                        x1: cx + width / 2,
+                        y1: cy + height / 2,
+                        fillcolor: colors[j],
+                        opacity: 0.15,
+                        line: {
+                            color: colors[j],
+                            width: 1
+                        },
+                        layer: 'below'
+                    });
+                }
+            }
+        }
+        
+        const layout = {
+            title: {
+                text: `K-Means Clustering - Round ${round}`,
+                font: { family: 'JetBrains Mono, monospace', size: 16 }
+            },
+            xaxis: {
+                title: 'X',
+                range: [0, 20],
+                gridcolor: '#e5e7eb',
+                fixedrange: true
+            },
+            yaxis: {
+                title: 'Y',
+                range: [0, 20],
+                scaleanchor: 'x',
+                scaleratio: 1,
+                gridcolor: '#e5e7eb',
+                fixedrange: true
+            },
+            shapes: shapes,
+            hovermode: false,
+            showlegend: true,
+            legend: {
+                x: 1,
+                y: 1,
+                xanchor: 'right',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                bordercolor: 'black',
+                borderwidth: 1
+            },
+            paper_bgcolor: 'white',
+            plot_bgcolor: 'white',
+            margin: { l: 50, r: 50, t: 50, b: 50 },
+            width: null,
+            height: null,
+            autosize: true
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: false,
+            staticPlot: true
+        };
+        
+        Plotly.newPlot('plotContainer', traces, layout, config);
+        roundValue.textContent = round;
     }
 
     roundSlider.addEventListener('input', (e) => {
@@ -242,25 +442,22 @@
     });
 
     playBtn.addEventListener('click', () => {
-        if (plotCache.length === 0) {
+        if (!clusteringData) {
             alert("Please configure parameters and generate clusters first.");
             return;
         }
 
         if (isPlaying) {
-            // Stop animation
             isPlaying = false;
             playBtn.textContent = '▶ play animation';
             clearInterval(playInterval);
         } else {
-            // Start animation
             isPlaying = true;
             playBtn.textContent = '⏸ pause animation';
             
             playInterval = setInterval(() => {
                 let currentRound = parseInt(roundSlider.value);
                 
-                // Loop back to -1 when max is reached
                 if (currentRound >= maxRounds) {
                     currentRound = -1;
                 } else {
@@ -268,17 +465,17 @@
                 }
                 
                 roundSlider.value = currentRound;
-                displayPlot(currentRound); 
-            }, 1000); // 1 second interval for animation speed
+                displayPlot(currentRound);
+            }, 1000);
         }
     });
 
     resetBtn.addEventListener('click', () => {
         if (isPlaying) {
-            playBtn.click(); // Stop animation
+            playBtn.click();
         }
         roundSlider.value = -1;
-        if (plotCache.length > 0) {
+        if (clusteringData) {
             displayPlot(-1);
         }
     });
