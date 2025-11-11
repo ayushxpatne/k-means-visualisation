@@ -6,7 +6,7 @@ import random
 import numpy as np
 import io
 import base64
-from matplotlib.patches import FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch, Ellipse
 
 app = Flask(__name__)
 app.secret_key = 'kmeans_secret_key_2024'
@@ -146,6 +146,35 @@ def create_plot_base64(k, history_index, history):
                                            color=colors[j], alpha=alpha, linewidth=1.5)
                     ax.add_patch(arrow)
     
+    
+    # ------------------------------------------------------------------
+    # *** NEW FEATURE: Cluster Glow (Ellipse) ***
+    # ------------------------------------------------------------------
+    if round_num >= 0:
+        for j in range(k):
+            points = np.array(current_state['assignments'][j])
+            
+            if len(points) >= 2: # Need at least 2 points to calculate variance
+                cx, cy = current_state['centroids'][j]
+                
+                # Calculate standard deviation for spread (or covariance for orientation)
+                std_x = np.std(points[:, 0]) * 1.5 # 1.5x scaling for visibility
+                std_y = np.std(points[:, 1]) * 1.5 
+                
+                # Use a larger minimum size to ensure small clusters are visible
+                width = max(std_x * 2, 2.5) 
+                height = max(std_y * 2, 2.5)
+                
+                # Create and add the translucent ellipse
+                ellipse = Ellipse((cx, cy), width, height, 
+                                  angle=0, # Simplification: assume no rotation
+                                  alpha=0.15, # Faint glow
+                                  facecolor=colors[j],
+                                  edgecolor=colors[j],
+                                  linewidth=1,
+                                  zorder=0) # Place far back
+                ax.add_patch(ellipse)
+
     # Plot points
     if round_num == -1:
         # Round -1: Plot all points in a neutral color (unassigned)
@@ -162,7 +191,7 @@ def create_plot_base64(k, history_index, history):
                 points_x = [p[0] for p in points]
                 points_y = [p[1] for p in points]
                 ax.scatter(points_x, points_y, c=colors[j], s=80, 
-                          alpha=0.6, edgecolors='black', linewidth=1)
+                          alpha=0.6, edgecolors='black', linewidth=1, zorder=1) # Above the glow
 
     # Plot ghost of previous centroid (Ghost only appears for Round 1 onwards)
     if round_num >= 1:
@@ -204,7 +233,6 @@ def create_plot_base64(k, history_index, history):
 
 @app.route('/')
 def index():
-    # FIX: Ensure Flask renders the template correctly
     return render_template('kmeans_index.html')
 
 @app.route('/generate', methods=['POST'])
@@ -216,7 +244,6 @@ def generate():
     x_arr, y_arr = generate_points(n)
     history = run_kmeans(x_arr, y_arr, k, rounds)
     
-    # Total states: Round -1 + Round 0 + rounds (R1...R_rounds) = rounds + 2
     total_states = rounds + 2 
     all_plots_base64 = []
     
