@@ -1,4 +1,4 @@
-## K-Means Clustering Visualizer 📊
+## K-Means Clustering Visualizer 
 
 The live demo can be accessed here: [https://k-means-visualisation.onrender.com](https://k-means-visualisation.onrender.com)
 but it will be slow, the best way is to clone the repo and run locally. if you liked the project consider starring it :)
