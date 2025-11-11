@@ -11,7 +11,8 @@
             <form id="generateForm" class="space-y-6">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="font-medium mono">n <span class="text-gray-700 font-normal">(number of points)</span></label>
+                        <label class="font-medium mono">n <span class="text-gray-700 font-normal">(number of
+                                points)</span></label>
                         <span id="nValue" class="mono text-sm bg-white px-3 py-1 border border-black">50</span>
                     </div>
                     <input type="range" name="n" id="nInput" min="10" max="100" step="10" value="50" class="w-full">
@@ -20,7 +21,8 @@
 
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="font-medium mono">k <span class="text-gray-700 font-normal">(number of clusters)</span></label>
+                        <label class="font-medium mono">k <span class="text-gray-700 font-normal">(number of
+                                clusters)</span></label>
                         <span id="kValue" class="mono text-sm bg-white px-3 py-1 border border-black">3</span>
                     </div>
                     <input type="range" name="k" id="kInput" min="2" max="10" step="1" value="3" class="w-full">
@@ -29,13 +31,15 @@
 
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="font-medium mono">rounds <span class="text-gray-700 font-normal">(iterations)</span></label>
+                        <label class="font-medium mono">rounds <span
+                                class="text-gray-700 font-normal">(iterations)</span></label>
                         <span id="roundsValue" class="mono text-sm bg-white px-3 py-1 border border-black">10</span>
                     </div>
-                    <input type="range" name="rounds" id="roundsInput" min="1" max="20" step="1" value="10" class="w-full">
+                    <input type="range" name="rounds" id="roundsInput" min="1" max="20" step="1" value="10"
+                        class="w-full">
                     <p class="text-xs text-gray-700 mt-1 mono">range: 1-20 rounds</p>
                 </div>
-                
+
                 <!-- <div class="mt-4 p-3 bg-gray-100 border border-black mono text-xs text-gray-800">
                     <p class="font-semibold mb-1">Recommended for Website:</p>
                     <p>For best performance on the live website, use **50 points**, **3 clusters**, and **5 rounds**.</p>
@@ -65,14 +69,15 @@
                 <div class="space-y-2 text-xs mono text-gray-800">
                     <p>→ <span class="font-semibold">Round -1:</span> Points generated, centroids initialized</p>
                     <p>→ <span class="font-semibold">Round 0:</span> Points assigned to nearest centroid</p>
-                    <p>→ <span class="font-semibold">Round 1+:</span> Centroids move to cluster centers & points are reassigned</p>
+                    <p>→ <span class="font-semibold">Round 1+:</span> Centroids move to cluster centers & points are
+                        reassigned</p>
                     <p>→ <span class="font-semibold">Repeat:</span> Until convergence or max rounds</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="lg:col-span-2">
+  <div class="lg:col-span-2">
         <div class="border border-black p-6">
             <div id="visualizationSection" class="hidden">
                 <h2 class="text-xl font-semibold mb-4 mono">visualization</h2>
@@ -82,6 +87,10 @@
                         <label class="font-medium mono">round</label>
                         <span id="roundValue" class="mono text-sm bg-white px-3 py-1 border border-black">-1</span>
                     </div>
+                    
+                    <p class="text-xs text-gray-700 mb-2 mono">
+                        use this slider to see how centroid changes over time or use the play animation below
+                    </p>
                     <input type="range" id="roundSlider" min="-1" max="10" step="1" value="-1" class="w-full">
                     <div class="flex justify-between text-xs mono text-gray-700 mt-1">
                         <span>initial</span>
@@ -112,7 +121,8 @@
             <div class="space-y-1 text-xs mono text-gray-800">
                 <p>● <span class="text-gray-700">colored circles:</span> data points in each cluster</p>
                 <p>● <span class="text-gray-500">grey circles:</span> unassigned points (Round -1)</p>
-                <p>○ <span class="text-gray-700">faint colored ellipse:</span> subtle **cluster glow** (based on point spread)</p>
+                <p>○ <span class="text-gray-700">faint colored ellipse:</span> subtle **cluster glow** (based on point
+                    spread)</p>
                 <p>✕ <span class="text-gray-700">large crosses:</span> current centroid positions</p>
                 <p><span class="text-gray-400">faint ✕:</span> previous centroid position (ghost)</p>
                 <p>⋯ <span class="text-gray-700">dashed lines:</span> centroid movement trail</p>
@@ -123,10 +133,10 @@
         <div class="mt-4 p-4 bg-white border border-black">
             <h3 class="font-semibold mono text-sm mb-2">understanding k-means:</h3>
             <p class="text-xs mono text-gray-800 leading-relaxed">
-                K-Means is an <span class="font-semibold">unsupervised learning</span> algorithm that groups 
-                similar data points together. It works by iteratively updating cluster centers (centroids) 
-                until they stabilize. The algorithm minimizes the <span class="font-semibold">within-cluster 
-                sum of squares</span>, making points within each cluster as similar as possible. Use the 
+                K-Means is an <span class="font-semibold">unsupervised learning</span> algorithm that groups
+                similar data points together. It works by iteratively updating cluster centers (centroids)
+                until they stabilize. The algorithm minimizes the <span class="font-semibold">within-cluster
+                    sum of squares</span>, making points within each cluster as similar as possible. Use the
                 slider to see how centroids move and clusters form over iterations!
             </p>
         </div>
@@ -160,9 +170,9 @@
     let isPlaying = false;
     let playInterval = null;
     let clusteringData = null;
-    
-    const colors = ['#ef4444', '#ec4899', '#22c55e', '#3b82f6', '#f97316', 
-                   '#a855f7', '#78716c', '#64748b', '#84cc16', '#06b6d4'];
+
+    const colors = ['#ef4444', '#ec4899', '#22c55e', '#3b82f6', '#f97316',
+        '#a855f7', '#78716c', '#64748b', '#84cc16', '#06b6d4'];
 
     nInput.addEventListener('input', () => nValue.textContent = nInput.value);
     kInput.addEventListener('input', () => kValue.textContent = kInput.value);
@@ -192,19 +202,19 @@
             if (data.success) {
                 document.getElementById('pointCount').textContent = data.n;
                 document.getElementById('clusterCount').textContent = data.k;
-                
+
                 maxRounds = data.rounds;
                 clusteringData = data;
-                
+
                 roundSlider.min = -1;
                 roundSlider.max = maxRounds;
                 roundSlider.value = -1;
                 maxRoundLabel.textContent = `round ${maxRounds}`;
-                
+
                 success.classList.remove('hidden');
                 visualizationSection.classList.remove('hidden');
                 initialState.classList.add('hidden');
-                
+
                 displayPlot(-1);
             }
         } catch (error) {
@@ -216,20 +226,20 @@
 
     function displayPlot(round) {
         if (!clusteringData) return;
-        
+
         const historyIndex = round + 1;
         const currentState = clusteringData.history[historyIndex];
         const k = clusteringData.k;
-        
+
         const traces = [];
-        
+
         // Plot points
         if (round === -1) {
             // Unassigned points
             const points = currentState.all_points;
             const x = points.map(p => p[0]);
             const y = points.map(p => p[1]);
-            
+
             traces.push({
                 x: x,
                 y: y,
@@ -250,7 +260,7 @@
                 if (points.length > 0) {
                     const x = points.map(p => p[0]);
                     const y = points.map(p => p[1]);
-                    
+
                     traces.push({
                         x: x,
                         y: y,
@@ -267,18 +277,18 @@
                 }
             }
         }
-        
+
         // Plot centroid trails (Round 0 onwards)
         if (round >= 0) {
             for (let j = 0; j < k; j++) {
                 const trailX = [];
                 const trailY = [];
-                
+
                 for (let r = 1; r <= Math.min(historyIndex, clusteringData.history.length - 1); r++) {
                     trailX.push(clusteringData.history[r].centroids[j][0]);
                     trailY.push(clusteringData.history[r].centroids[j][1]);
                 }
-                
+
                 if (trailX.length > 1) {
                     traces.push({
                         x: trailX,
@@ -303,14 +313,14 @@
                 }
             }
         }
-        
+
         // Plot ghost centroids (Round 1 onwards)
         if (round >= 1) {
             const prevCentroids = currentState.prev_centroids;
             const ghostX = prevCentroids.map(c => c[0]);
             const ghostY = prevCentroids.map(c => c[1]);
             const ghostColors = Array(k).fill(0).map((_, j) => colors[j]);
-            
+
             traces.push({
                 x: ghostX,
                 y: ghostY,
@@ -327,12 +337,12 @@
                 }
             });
         }
-        
+
         // Plot current centroids
         const centroidX = currentState.centroids.map(c => c[0]);
         const centroidY = currentState.centroids.map(c => c[1]);
         const centroidColors = Array(k).fill(0).map((_, j) => colors[j]);
-        
+
         traces.push({
             x: centroidX,
             y: centroidY,
@@ -347,7 +357,7 @@
                 line: { color: 'black', width: 2 }
             }
         });
-        
+
         // Add cluster ellipses as shapes (Round 0 onwards)
         const shapes = [];
         if (round >= 0) {
@@ -356,18 +366,18 @@
                 if (points.length >= 2) {
                     const cx = currentState.centroids[j][0];
                     const cy = currentState.centroids[j][1];
-                    
+
                     const xs = points.map(p => p[0]);
                     const ys = points.map(p => p[1]);
-                    
+
                     const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
                     const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
                     const stdX = Math.sqrt(xs.reduce((s, x) => s + (x - meanX) ** 2, 0) / xs.length) * 1.5;
                     const stdY = Math.sqrt(ys.reduce((s, y) => s + (y - meanY) ** 2, 0) / ys.length) * 1.5;
-                    
+
                     const width = Math.max(stdX * 2, 2.5);
                     const height = Math.max(stdY * 2, 2.5);
-                    
+
                     shapes.push({
                         type: 'circle',
                         xref: 'x',
@@ -387,7 +397,7 @@
                 }
             }
         }
-        
+
         const layout = {
             title: {
                 text: `K-Means Clustering - Round ${round}`,
@@ -425,13 +435,13 @@
             height: null,
             autosize: true
         };
-        
+
         const config = {
             responsive: true,
             displayModeBar: false,
             staticPlot: true
         };
-        
+
         Plotly.newPlot('plotContainer', traces, layout, config);
         roundValue.textContent = round;
     }
@@ -454,16 +464,16 @@
         } else {
             isPlaying = true;
             playBtn.textContent = '⏸ pause animation';
-            
+
             playInterval = setInterval(() => {
                 let currentRound = parseInt(roundSlider.value);
-                
+
                 if (currentRound >= maxRounds) {
                     currentRound = -1;
                 } else {
                     currentRound++;
                 }
-                
+
                 roundSlider.value = currentRound;
                 displayPlot(currentRound);
             }, 1000);
