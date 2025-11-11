@@ -28,11 +28,9 @@ def initialize_centroids(k, x_max=20, y_max=20):
 
 def assign_centroids(x_arr, y_arr, centroids_data, k):
     """Assign points to nearest centroid"""
-    # Clear previous assignments
     for j in range(k):
         centroids_data[f"centroid_{j}_points"] = []
     
-    # Assign each point to nearest centroid
     for i in range(len(x_arr)):
         x1, y1 = x_arr[i], y_arr[i]
         
@@ -72,27 +70,48 @@ def run_kmeans(x_arr, y_arr, k, rounds):
         centroids_data[f"centroid_{j}_xy"] = [x_c[j], y_c[j]]
         centroids_data[f"centroid_{j}_points"] = []
     
-    # Store history of centroid positions - initial state
+    # Round -1: Initial State (Points and Centroids, NO assignment)
     history = [{
         'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
-        'assignments': [[] for j in range(k)]
+        'assignments': [[] for j in range(k)], # Empty assignment list
+        'all_points': list(zip(x_arr, y_arr)), # Full list of all points
+        'prev_centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
     }]
     
-    # Run K-means for specified rounds
+    # Round 0: First Assignment Step (Points are now colored)
+    assign_centroids(x_arr, y_arr, centroids_data, k)
+    
+    history.append({
+        'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
+        'assignments': [[list(p) for p in centroids_data[f"centroid_{j}_points"]] for j in range(k)],
+        'all_points': [],
+        'prev_centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)], # Previous is the initial random position
+    })
+    
+    # Run K-means for Rounds 1 to 'rounds'
     for round_num in range(rounds):
-        assign_centroids(x_arr, y_arr, centroids_data, k)
+        
+        prev_centroids_state = [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)]
+        
+        # K-Means Step 1: Recalculate Centroid Positions 
         recalculate_centroids(centroids_data, k)
         
-        # Store this round's state
+        # K-Means Step 2: Assign Points
+        assign_centroids(x_arr, y_arr, centroids_data, k)
+        
         history.append({
             'centroids': [list(centroids_data[f"centroid_{j}_xy"]) for j in range(k)],
-            'assignments': [[list(p) for p in centroids_data[f"centroid_{j}_points"]] for j in range(k)]
+            'assignments': [[list(p) for p in centroids_data[f"centroid_{j}_points"]] for j in range(k)],
+            'all_points': [],
+            'prev_centroids': prev_centroids_state,
         })
     
     return history
 
-def create_plot(x_arr, y_arr, k, round_num, history):
-    """Create visualization for a specific round"""
+def create_plot_base64(k, history_index, history):
+    """Create visualization for a specific history index"""
+    round_num = history_index - 1
+    
     colors = ['#ef4444', '#ec4899', '#22c55e', '#3b82f6', '#f97316', 
               '#a855f7', '#78716c', '#64748b', '#84cc16', '#06b6d4']
     
@@ -106,47 +125,71 @@ def create_plot(x_arr, y_arr, k, round_num, history):
     ax.set_title(f'K-Means Clustering - Round {round_num}', 
                  fontsize=14, fontfamily='monospace', pad=20)
     
-    current_state = history[round_num]
+    current_state = history[history_index]
     
-    # Plot centroid trails with arrows
-    for j in range(k):
-        trail_x = [history[r]['centroids'][j][0] for r in range(min(round_num + 1, len(history)))]
-        trail_y = [history[r]['centroids'][j][1] for r in range(min(round_num + 1, len(history)))]
-        
-        # Draw trail with decreasing alpha
-        for i in range(len(trail_x) - 1):
-            alpha = (i + 1) / len(trail_x) * 0.5
-            ax.plot(trail_x[i:i+2], trail_y[i:i+2], 
-                   color=colors[j], alpha=alpha, linewidth=2, linestyle='--')
+    # Plot centroid trails (Round 0 onwards)
+    if round_num >= 0:
+        for j in range(k):
+            # Trail starts from Round 0 (history index 1)
+            trail_x = [history[r]['centroids'][j][0] for r in range(1, min(history_index + 1, len(history)))]
+            trail_y = [history[r]['centroids'][j][1] for r in range(1, min(history_index + 1, len(history)))]
             
-            # Add arrow at the end of each segment
-            if i < len(trail_x) - 2:
-                arrow = FancyArrowPatch((trail_x[i], trail_y[i]), 
-                                       (trail_x[i+1], trail_y[i+1]),
-                                       arrowstyle='->', mutation_scale=15, 
-                                       color=colors[j], alpha=alpha, linewidth=1.5)
-                ax.add_patch(arrow)
+            for i in range(len(trail_x) - 1):
+                alpha = (i + 1) / len(trail_x) * 0.5
+                ax.plot(trail_x[i:i+2], trail_y[i:i+2], 
+                       color=colors[j], alpha=alpha, linewidth=2, linestyle='--')
+                
+                if i < len(trail_x) - 1:
+                    arrow = FancyArrowPatch((trail_x[i], trail_y[i]), 
+                                           (trail_x[i+1], trail_y[i+1]),
+                                           arrowstyle='->', mutation_scale=15, 
+                                           color=colors[j], alpha=alpha, linewidth=1.5)
+                    ax.add_patch(arrow)
     
-    # Plot points assigned to each centroid
-    for j in range(k):
-        if len(current_state['assignments'][j]) > 0:
-            points = current_state['assignments'][j]
-            points_x = [p[0] for p in points]
-            points_y = [p[1] for p in points]
-            ax.scatter(points_x, points_y, c=colors[j], s=80, 
-                      alpha=0.6, edgecolors='black', linewidth=1)
+    # Plot points
+    if round_num == -1:
+        # Round -1: Plot all points in a neutral color (unassigned)
+        points = current_state['all_points']
+        points_x = [p[0] for p in points]
+        points_y = [p[1] for p in points]
+        ax.scatter(points_x, points_y, c='#4b5563', s=80, 
+                  alpha=0.6, edgecolors='black', linewidth=1)
+    else:
+        # Round 0 onwards: Plot points assigned to each centroid
+        for j in range(k):
+            if len(current_state['assignments'][j]) > 0:
+                points = current_state['assignments'][j]
+                points_x = [p[0] for p in points]
+                points_y = [p[1] for p in points]
+                ax.scatter(points_x, points_y, c=colors[j], s=80, 
+                          alpha=0.6, edgecolors='black', linewidth=1)
+
+    # Plot ghost of previous centroid (Ghost only appears for Round 1 onwards)
+    if round_num >= 1:
+        prev_state = history[history_index]['prev_centroids']
+        for j in range(k):
+            px, py = prev_state[j]
+            ax.scatter(px, py, c=colors[j], s=400, marker='X', 
+                      edgecolors='black', linewidth=2, zorder=9, alpha=0.3)
+            ax.scatter(px, py, c='white', s=100, marker='X', zorder=10, alpha=0.3)
     
-    # Plot current centroids
+    # Plot current centroids (always plotted)
     for j in range(k):
         cx, cy = current_state['centroids'][j]
         ax.scatter(cx, cy, c=colors[j], s=400, marker='X', 
-                  edgecolors='black', linewidth=2, zorder=10)
-        ax.scatter(cx, cy, c='white', s=100, marker='X', zorder=11)
+                  edgecolors='black', linewidth=2, zorder=11)
+        ax.scatter(cx, cy, c='white', s=100, marker='X', zorder=12)
     
     # Add legend
     legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
                                  markerfacecolor=colors[j], markersize=10, 
                                  label=f'Cluster {j+1}') for j in range(k)]
+    
+    if round_num == -1:
+         legend_elements.insert(0, plt.Line2D([0], [0], marker='o', color='w', 
+                                 markerfacecolor='#4b5563', markersize=10, 
+                                 label='Unassigned Points'))
+    
     ax.legend(handles=legend_elements, loc='upper right', 
              framealpha=0.9, fontsize=10)
     
@@ -155,12 +198,13 @@ def create_plot(x_arr, y_arr, k, round_num, history):
     plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close()
+    plt.close(fig)
     
     return img_base64
 
 @app.route('/')
 def index():
+    # FIX: Ensure Flask renders the template correctly
     return render_template('kmeans_index.html')
 
 @app.route('/generate', methods=['POST'])
@@ -169,46 +213,24 @@ def generate():
     k = int(request.form.get('k', 3))
     rounds = int(request.form.get('rounds', 10))
     
-    # Generate points
     x_arr, y_arr = generate_points(n)
-    
-    # Run K-means
     history = run_kmeans(x_arr, y_arr, k, rounds)
     
-    # Store in session
-    session['x_arr'] = x_arr
-    session['y_arr'] = y_arr
-    session['k'] = k
-    session['rounds'] = rounds
-    session['history'] = history
+    # Total states: Round -1 + Round 0 + rounds (R1...R_rounds) = rounds + 2
+    total_states = rounds + 2 
+    all_plots_base64 = []
+    
+    for r in range(total_states): 
+        img_base64 = create_plot_base64(k, r, history)
+        all_plots_base64.append(img_base64)
     
     return jsonify({
         'success': True,
         'n': n,
         'k': k,
-        'rounds': rounds
-    })
-
-@app.route('/get_plot/<int:round_num>')
-def get_plot(round_num):
-    x_arr = session.get('x_arr')
-    y_arr = session.get('y_arr')
-    k = session.get('k')
-    history = session.get('history')
-    
-    if not all([x_arr, y_arr, k, history]):
-        return jsonify({'error': 'No data available'}), 400
-    
-    # Ensure round_num is within bounds
-    round_num = min(round_num, len(history) - 1)
-    
-    img_base64 = create_plot(x_arr, y_arr, k, round_num, history)
-    
-    return jsonify({
-        'image': img_base64,
-        'round': round_num,
-        'total_rounds': len(history) - 1
+        'rounds': rounds,
+        'plots': all_plots_base64
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)

@@ -4,33 +4,35 @@
 
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Left Panel - Controls -->
     <div class="lg:col-span-1">
         <div class="border border-black p-6 sticky top-4">
             <h2 class="text-2xl font-semibold mb-6 mono">configure_parameters()</h2>
 
             <form id="generateForm" class="space-y-6">
                 <div>
-                    <label class="block mb-2 font-medium mono">
-                        n <span class="text-gray-700 font-normal">(number of points)</span>
-                    </label>
-                    <input type="number" name="n" id="nInput" value="50" min="10" max="100" class="input-field" required>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-medium mono">n <span class="text-gray-700 font-normal">(number of points)</span></label>
+                        <span id="nValue" class="mono text-sm bg-white px-3 py-1 border border-black">50</span>
+                    </div>
+                    <input type="range" name="n" id="nInput" min="10" max="100" step="10" value="50" class="w-full">
                     <p class="text-xs text-gray-700 mt-1 mono">range: 10-100 points</p>
                 </div>
 
                 <div>
-                    <label class="block mb-2 font-medium mono">
-                        k <span class="text-gray-700 font-normal">(number of clusters)</span>
-                    </label>
-                    <input type="number" name="k" id="kInput" value="3" min="2" max="10" class="input-field" required>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-medium mono">k <span class="text-gray-700 font-normal">(number of clusters)</span></label>
+                        <span id="kValue" class="mono text-sm bg-white px-3 py-1 border border-black">3</span>
+                    </div>
+                    <input type="range" name="k" id="kInput" min="2" max="10" step="1" value="3" class="w-full">
                     <p class="text-xs text-gray-700 mt-1 mono">range: 2-10 clusters</p>
                 </div>
 
                 <div>
-                    <label class="block mb-2 font-medium mono">
-                        rounds <span class="text-gray-700 font-normal">(iterations)</span>
-                    </label>
-                    <input type="number" name="rounds" id="roundsInput" value="10" min="1" max="50" class="input-field" required>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-medium mono">rounds <span class="text-gray-700 font-normal">(iterations)</span></label>
+                        <span id="roundsValue" class="mono text-sm bg-white px-3 py-1 border border-black">10</span>
+                    </div>
+                    <input type="range" name="rounds" id="roundsInput" min="1" max="50" step="1" value="10" class="w-full">
                     <p class="text-xs text-gray-700 mt-1 mono">range: 1-50 rounds</p>
                 </div>
 
@@ -43,7 +45,7 @@
 
             <div id="loading" class="hidden mt-6 text-center mono text-sm">
                 <div class="spinner mx-auto mb-3"></div>
-                <div class="pulse">running k-means algorithm...</div>
+                <div class="pulse">running k-means algorithm & rendering plots...</div>
             </div>
 
             <div id="success" class="hidden mt-6 p-4 border border-black">
@@ -56,73 +58,66 @@
             <div class="mt-6 p-4 bg-white border border-black">
                 <h3 class="font-semibold mono text-sm mb-2">how it works:</h3>
                 <div class="space-y-2 text-xs mono text-gray-800">
-                    <p>→ <span class="font-semibold">Step 1:</span> Random centroids are initialized</p>
-                    <p>→ <span class="font-semibold">Step 2:</span> Points assigned to nearest centroid</p>
-                    <p>→ <span class="font-semibold">Step 3:</span> Centroids move to cluster centers</p>
+                    <p>→ <span class="font-semibold">Round -1:</span> Points generated, centroids initialized</p>
+                    <p>→ <span class="font-semibold">Round 0:</span> Points assigned to nearest centroid</p>
+                    <p>→ <span class="font-semibold">Round 1+:</span> Centroids move to cluster centers & points are reassigned</p>
                     <p>→ <span class="font-semibold">Repeat:</span> Until convergence or max rounds</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Right Panel - Visualization -->
     <div class="lg:col-span-2">
         <div class="border border-black p-6">
             <div id="visualizationSection" class="hidden">
                 <h2 class="text-xl font-semibold mb-4 mono">visualization</h2>
 
-                <!-- Round Slider -->
                 <div class="mb-6">
                     <div class="flex justify-between items-center mb-2">
                         <label class="font-medium mono">round</label>
-                        <span id="roundValue" class="mono text-sm bg-white px-3 py-1 border border-black">0</span>
+                        <span id="roundValue" class="mono text-sm bg-white px-3 py-1 border border-black">-1</span>
                     </div>
-                    <input type="range" id="roundSlider" min="0" max="10" step="1" value="0" class="w-full">
+                    <input type="range" id="roundSlider" min="-1" max="10" step="1" value="-1" class="w-full">
                     <div class="flex justify-between text-xs mono text-gray-700 mt-1">
                         <span>initial</span>
                         <span id="maxRoundLabel">round 10</span>
                     </div>
                 </div>
 
-                <!-- Plot Container -->
                 <div id="plotContainer" class="relative border border-black">
-                    <div id="plotLoading" class="text-center py-16 mono text-sm">
-                        <div class="spinner mx-auto mb-3"></div>
-                        <div class="pulse">loading visualization...</div>
-                    </div>
+                    <div id="plotLoading" class="text-center py-16 mono text-sm hidden">
+                        </div>
                     <img id="plotImage" src="" alt="K-Means Clustering" class="w-full hidden">
                 </div>
 
-                <!-- Controls -->
                 <div class="mt-4 flex gap-4">
                     <button id="playBtn" class="btn flex-1 mono">
                         ▶ play animation
                     </button>
                     <button id="resetBtn" class="btn-outline flex-1 mono">
-                        reset to round 0
+                        reset to round -1
                     </button>
                 </div>
             </div>
 
-            <!-- Initial State -->
             <div id="initialState" class="text-center py-16 mono">
                 <p class="text-gray-500 mb-4">← configure parameters and generate clusters</p>
                 <p class="text-xs text-gray-500">visualization will appear here</p>
             </div>
         </div>
 
-        <!-- Legend -->
         <div class="mt-4 p-4 bg-white border border-black">
             <h3 class="font-semibold mono text-sm mb-2">legend:</h3>
             <div class="space-y-1 text-xs mono text-gray-800">
                 <p>● <span class="text-gray-700">colored circles:</span> data points in each cluster</p>
+                <p>● <span class="text-gray-500">grey circles:</span> unassigned points (Round -1)</p>
                 <p>✕ <span class="text-gray-700">large crosses:</span> current centroid positions</p>
+                <p><span class="text-gray-400">faint ✕:</span> previous centroid position (ghost)</p>
                 <p>⋯ <span class="text-gray-700">dashed lines:</span> centroid movement trail</p>
                 <p>→ <span class="text-gray-700">arrows:</span> direction of centroid movement</p>
             </div>
         </div>
 
-        <!-- Educational Info -->
         <div class="mt-4 p-4 bg-white border border-black">
             <h3 class="font-semibold mono text-sm mb-2">understanding k-means:</h3>
             <p class="text-xs mono text-gray-800 leading-relaxed">
@@ -144,7 +139,6 @@
     const success = document.getElementById('success');
     const visualizationSection = document.getElementById('visualizationSection');
     const initialState = document.getElementById('initialState');
-    const plotLoading = document.getElementById('plotLoading');
     const plotImage = document.getElementById('plotImage');
     const roundSlider = document.getElementById('roundSlider');
     const roundValue = document.getElementById('roundValue');
@@ -152,20 +146,43 @@
     const playBtn = document.getElementById('playBtn');
     const resetBtn = document.getElementById('resetBtn');
 
+    // Element references for sliders
+    const nInput = document.getElementById('nInput');
+    const nValue = document.getElementById('nValue');
+    const kInput = document.getElementById('kInput');
+    const kValue = document.getElementById('kValue');
+    const roundsInput = document.getElementById('roundsInput');
+    const roundsValue = document.getElementById('roundsValue');
+
+
     let maxRounds = 10;
     let isPlaying = false;
     let playInterval = null;
+    let plotCache = []; // This will now hold ALL base64 images, starting with Round -1
+
+    // Update value displays for sliders
+    nInput.addEventListener('input', () => nValue.textContent = nInput.value);
+    kInput.addEventListener('input', () => kValue.textContent = kInput.value);
+    roundsInput.addEventListener('input', () => roundsValue.textContent = roundsInput.value);
 
     generateForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        // Stop any running animation
+        if (isPlaying) {
+            playBtn.click();
+        }
+
         loading.classList.remove('hidden');
         success.classList.add('hidden');
         visualizationSection.classList.add('hidden');
+        plotImage.classList.add('hidden');
+        plotCache = []; // Clear cache
 
         const formData = new FormData(generateForm);
 
         try {
+            // ONE API CALL TO GENERATE ALL CLUSTERS AND PLOTS
             const response = await fetch('/generate', {
                 method: 'POST',
                 body: formData
@@ -176,18 +193,23 @@
             if (data.success) {
                 document.getElementById('pointCount').textContent = data.n;
                 document.getElementById('clusterCount').textContent = data.k;
+                
                 maxRounds = data.rounds;
                 
+                // Set slider range from -1 up to maxRounds
+                roundSlider.min = -1;
                 roundSlider.max = maxRounds;
-                roundSlider.value = 0;
+                roundSlider.value = -1; // Start at Round -1
                 maxRoundLabel.textContent = `round ${maxRounds}`;
+
+                plotCache = data.plots; // Store all base64 strings (index 0 is Round -1)
                 
                 success.classList.remove('hidden');
                 visualizationSection.classList.remove('hidden');
                 initialState.classList.add('hidden');
                 
-                // Load initial plot
-                await loadPlot(0);
+                // Display initial plot (-1) from cache instantly
+                displayPlot(-1);
             }
         } catch (error) {
             alert('Error generating clusters: ' + error.message);
@@ -196,31 +218,31 @@
         }
     });
 
-    async function loadPlot(round) {
-        plotLoading.classList.remove('hidden');
-        plotImage.classList.add('hidden');
-        roundValue.textContent = round;
-
-        try {
-            const response = await fetch(`/get_plot/${round}`);
-            const data = await response.json();
-
-            if (data.image) {
-                plotImage.src = 'data:image/png;base64,' + data.image;
-                plotImage.classList.remove('hidden');
-                plotLoading.classList.add('hidden');
-            }
-        } catch (error) {
-            console.error('Error loading plot:', error);
+    // Function to display plot from the local cache instantly
+    function displayPlot(round) {
+        // Round -1 is at plotCache[0], Round 0 is at plotCache[1], etc.
+        const historyIndex = round + 1; 
+        if (plotCache[historyIndex]) {
+            plotImage.src = 'data:image/png;base64,' + plotCache[historyIndex];
+            plotImage.classList.remove('hidden');
+            roundValue.textContent = round;
+        } else {
+            plotImage.classList.add('hidden');
+            roundValue.textContent = round;
         }
     }
 
     roundSlider.addEventListener('input', (e) => {
         const round = parseInt(e.target.value);
-        loadPlot(round);
+        displayPlot(round);
     });
 
     playBtn.addEventListener('click', () => {
+        if (plotCache.length === 0) {
+            alert("Please configure parameters and generate clusters first.");
+            return;
+        }
+
         if (isPlaying) {
             // Stop animation
             isPlaying = false;
@@ -234,15 +256,16 @@
             playInterval = setInterval(() => {
                 let currentRound = parseInt(roundSlider.value);
                 
+                // Loop back to -1 when max is reached
                 if (currentRound >= maxRounds) {
-                    currentRound = 0;
+                    currentRound = -1;
                 } else {
                     currentRound++;
                 }
                 
                 roundSlider.value = currentRound;
-                loadPlot(currentRound);
-            }, 1000);
+                displayPlot(currentRound); // Instant display from cache
+            }, 1000); // 1 second interval for animation speed
         }
     });
 
@@ -250,8 +273,10 @@
         if (isPlaying) {
             playBtn.click(); // Stop animation
         }
-        roundSlider.value = 0;
-        loadPlot(0);
+        roundSlider.value = -1;
+        if (plotCache.length > 0) {
+            displayPlot(-1);
+        }
     });
 </script>
 {% endblock %}
